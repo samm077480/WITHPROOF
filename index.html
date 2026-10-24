@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamGuard Live - Multi-Device Proctoring System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        .hidden-view { display: none !important; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <!-- 1. ROLE SELECTION SCREEN -->
+    <div id="auth-screen" class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md">
+            <div class="text-center mb-6">
+                <span class="text-4xl">🛡️</span>
+                <h1 class="text-2xl font-bold mt-2 text-indigo-400">ExamGuard Cloud</h1>
+                <p class="text-sm text-slate-400">College Anti-Cheating Proctoring System</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs uppercase font-semibold text-slate-400 mb-1">Select Role</label>
+                    <select id="user-role" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500">
+                        <option value="student">Student</option>
+                        <option value="admin">Admin (Teacher)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase font-semibold text-slate-400 mb-1">Room Code</label>
+                    <input type="text" id="room-code" value="CSE001" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 uppercase font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div id="name-field-container">
+                    <label class="block text-xs uppercase font-semibold text-slate-400 mb-1">Your Name / Roll No</label>
+                    <input type="text" id="user-name" placeholder="e.g. Rahul Sharma" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase font-semibold text-slate-400 mb-1">Admin Unlock Password</label>
+                    <input type="password" id="admin-password" value="1234" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <button onclick="joinRoom()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-lg mt-2 cursor-pointer">
+                    Connect & Enter Room
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. ADMIN DASHBOARD -->
+    <div id="admin-screen" class="hidden-view min-h-screen p-6">
+        <div class="max-w-7xl mx-auto">
+            <header class="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700 mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-indigo-400">Teacher Proctoring Dashboard</h2>
+                    <p class="text-xs text-slate-400">Room Code: <span id="admin-room-display" class="font-mono font-bold text-white"></span></p>
+                </div>
+                <button onclick="logout()" class="bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/50 px-4 py-2 rounded-lg text-sm font-semibold transition">Logout</button>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Question Builder -->
+                <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl space-y-4">
+                    <h3 class="font-bold text-lg text-indigo-300">Question Builder (MCQ)</h3>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Total Exam Marks</label>
+                        <input type="number" id="exam-total-marks" value="10" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Question Text</label>
+                        <textarea id="q-text" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:outline-none" placeholder="Enter question..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="opt-a" placeholder="Option A" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <input type="text" id="opt-b" placeholder="Option B" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <input type="text" id="opt-c" placeholder="Option C" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <input type="text" id="opt-d" placeholder="Option D" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Correct Answer</label>
+                        <select id="correct-opt" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200">
+                            <option value="A">Option A</option>
+                            <option value="B">Option B</option>
+                            <option value="C">Option C</option>
+                            <option value="D">Option D</option>
+                        </select>
+                    </div>
+                    <button onclick="addQuestion()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 rounded-lg text-sm transition">Add to Paper</button>
+                    <button onclick="broadcastExam()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg text-sm transition shadow-lg">🚀 Cloud Broadcast Paper</button>
+                </div>
+
+                <!-- Participants Monitor -->
+                <div class="lg:col-span-2 bg-slate-800 border border-slate-700 p-6 rounded-xl flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg text-indigo-300">Live Participants & Scores Monitor</h3>
+                        <div class="flex gap-2 text-xs font-semibold">
+                            <span class="bg-emerald-900/60 text-emerald-300 border border-emerald-700 px-3 py-1 rounded-full">Active: <span id="count-active">0</span></span>
+                            <span class="bg-red-900/60 text-red-300 border border-red-700 px-3 py-1 rounded-full">Locked: <span id="count-locked">0</span></span>
+                        </div>
+                    </div>
+                    <div id="participants-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 overflow-y-auto max-h-[500px] p-2 bg-slate-900/50 rounded-lg border border-slate-700/50">
+                        <!-- Student cards injected dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. STUDENT EXAM SCREEN -->
+    <div id="student-screen" class="hidden-view min-h-screen p-6 flex flex-col">
+        <header class="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700 mb-6">
+            <div>
+                <h2 class="text-lg font-bold text-indigo-400">Exam Portal</h2>
+                <p class="text-xs text-slate-400">Candidate: <span id="student-name-display" class="font-bold text-white"></span></p>
+            </div>
+            <div class="bg-amber-500/20 border border-amber-500/40 text-amber-300 px-3 py-1 rounded-lg text-xs font-semibold">
+                ⚠️ Anti-Cheating Active
+            </div>
+        </header>
+
+        <main class="max-w-3xl mx-auto w-full flex-grow bg-slate-800 border border-slate-700 p-6 rounded-xl">
+            <div id="exam-paper-container">
+                <div class="text-center py-12 text-slate-400">
+                    <p class="text-lg">Waiting for teacher to broadcast exam paper...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- LOCKOUT MODAL -->
+    <div id="lockout-modal" class="hidden-view fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-red-500/50 p-8 rounded-2xl max-w-md w-full text-center space-y-4 shadow-2xl">
+            <div class="text-5xl">🔒</div>
+            <h2 class="text-2xl font-bold text-red-400">EXAM LOCKED!</h2>
+            <p class="text-sm text-slate-300">Aapne browser tab chhodne ya screen se hatne ki koshish ki. Violation recorded.</p>
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-700">
+                <p class="text-xs text-slate-400 mb-1 font-semibold">Total Violations: <span id="violation-count" class="text-red-400 font-bold">0</span></p>
+            </div>
+            <div>
+                <label class="block text-xs uppercase font-semibold text-slate-400 mb-1 text-left">Enter Admin Unlock Password</label>
+                <input type="password" id="unlock-pass-input" placeholder="Admin password..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500 mb-3">
+                <button onclick="tryUnlock()" class="w-full bg-red-600 hover:bg-red-500 text-white font-semibold py-3 rounded-lg transition shadow-lg">Unlock & Resume Exam</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript & Connected Firebase Realtime Database -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFBlPZcsICa-zxtiLTETW8NAHxyBdXgC8",
+            authDomain: "exam-gaurd.firebaseapp.com",
+            databaseURL: "https://exam-gaurd-default-rtdb.firebaseio.com",
+            projectId: "exam-gaurd",
+            storageBucket: "exam-gaurd.firebasestorage.app",
+            messagingSenderId: "337014345580",
+            appId: "1:337014345580:web:88a937ae73ad50e302ad49",
+            measurementId: "G-BDTVNGJH3G"
+        };
+
+        try {
+            firebase.initializeApp(firebaseConfig);
+        } catch(e) {
+            console.log("Firebase initialization error:", e);
+        }
+        
+        const db = typeof firebase !== 'undefined' ? firebase.database() : null;
+
+        let currentRole = 'student';
+        let roomCode = '';
+        let userName = '';
+        let adminPass = '';
+        let violationCount = 0;
+        let questionsList = [];
+        let roomRef = null;
+        let studentAnswers = {};
+        let totalExamMarks = 10;
+        let globalQuestions = [];
+
+        function joinRoom() {
+            currentRole = document.getElementById('user-role').value;
+            roomCode = document.getElementById('room-code').value.trim().toUpperCase();
+            adminPass = document.getElementById('admin-password').value.trim();
+            userName = document.getElementById('user-name').value.trim();
+
+            if (!roomCode) { alert('Room Code bharein!'); return; }
+            if (currentRole === 'student' && !userName) { alert('Apna naam bharein!'); return; }
+
+            if (db) {
+                roomRef = db.ref('rooms/' + roomCode);
+            }
+
+            document.getElementById('auth-screen').classList.add('hidden-view');
+
+            if (currentRole === 'admin') {
+                document.getElementById('admin-screen').classList.remove('hidden-view');
+                document.getElementById('admin-room-display').innerText = roomCode;
+                listenAdminData();
+            } else {
+                document.getElementById('student-screen').classList.remove('hidden-view');
+                document.getElementById('student-name-display').innerText = userName;
+                initStudentProctoring();
+                
+                if (roomRef) {
+                    roomRef.child('students/' + userName.replace(/[.#$\/\[\]]/g, '_')).set({
+                        name: userName,
+                        status: 'ACTIVE',
+                        violations: 0,
+                        score: 'Pending'
+                    });
+                    roomRef.child('examData').on('value', (snapshot) => {
+                        const data = snapshot.val();
+                        if (data && data.questions) {
+                            totalExamMarks = data.totalMarks || 10;
+                            renderExamPaper(data.questions);
+                        }
+                    });
+                }
+            }
+        }
+
+        function addQuestion() {
+            const text = document.getElementById('q-text').value;
+            const a = document.getElementById('opt-a').value;
+            const b = document.getElementById('opt-b').value;
+            const c = document.getElementById('opt-c').value;
+            const d = document.getElementById('opt-d').value;
+            const correct = document.getElementById('correct-opt').value;
+
+            if (!text) { alert('Question text enter karein!'); return; }
+
+            questionsList.push({ text, options: { A: a, B: b, C: c, D: d }, correct });
+            alert(`Question ${questionsList.length} added!`);
+            document.getElementById('q-text').value = '';
+            document.getElementById('opt-a').value = '';
+            document.getElementById('opt-b').value = '';
+            document.getElementById('opt-c').value = '';
+            document.getElementById('opt-d').value = '';
+        }
+
+        function broadcastExam() {
+            if (questionsList.length === 0) { alert('Pehle question add karein!'); return; }
+            totalExamMarks = document.getElementById('exam-total-marks').value;
+            if (roomRef) {
+                roomRef.child('examData').set({
+                    totalMarks: totalExamMarks,
+                    questions: questionsList
+                });
+                alert('Paper and Marks successfully broadcasted to cloud!');
+            } else {
+                alert('Cloud database not connected!');
+            }
+        }
+
+        function listenAdminData() {
+            if (roomRef) {
+                roomRef.child('students').on('value', (snapshot) => {
+                    const data = snapshot.val() || {};
+                    renderParticipantsGrid(data);
+                });
+            } else {
+                renderParticipantsGrid({});
+            }
+        }
+
+        function renderParticipantsGrid(studentsData) {
+            const grid = document.getElementById('participants-grid');
+            grid.innerHTML = '';
+            let activeCount = 0;
+            let lockedCount = 0;
+            const studentKeys = Object.keys(studentsData);
+
+            for (let i = 1; i <= 70; i++) {
+                let sName = `Slot ${i}`;
+                let status = 'INACTIVE';
+                let violations = 0;
+                let score = '-';
+
+                if (studentKeys[i - 1]) {
+                    const sObj = studentsData[studentKeys[i - 1]];
+                    sName = sObj.name;
+                    status = sObj.status;
+                    violations = sObj.violations || 0;
+                    score = sObj.score !== undefined ? sObj.score : 'Pending';
+                }
+
+                if (status === 'ACTIVE') activeCount++;
+                if (status === 'LOCKED') lockedCount++;
+
+                let bgColor = 'bg-slate-800/80 border-slate-700';
+                let textColor = 'text-slate-400';
+                if (status === 'ACTIVE') { bgColor = 'bg-emerald-950/40 border-emerald-700/60'; textColor = 'text-emerald-400'; }
+                if (status === 'LOCKED') { bgColor = 'bg-red-950/60 border-red-700'; textColor = 'text-red-400'; }
+
+                grid.innerHTML += `
+                    <div class="${bgColor} border p-3 rounded-xl flex flex-col justify-between items-center text-center shadow">
+                        <span class="text-xs font-bold text-slate-300 truncate w-full">${sName}</span>
+                        <span class="text-[10px] ${textColor} font-mono font-semibold my-1">${status}</span>
+                        <span class="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800 px-2 py-0.5 rounded w-full font-bold">Score: ${score}</span>
+                        <span class="text-[9px] text-slate-400 mt-1">Violations: ${violations}</span>
+                    </div>
+                `;
+            }
+            document.getElementById('count-active').innerText = activeCount;
+            document.getElementById('count-locked').innerText = lockedCount;
+        }
+
+        function initStudentProctoring() {
+            document.addEventListener('contextmenu', e => e.preventDefault());
+            document.addEventListener('copy', e => e.preventDefault());
+            document.addEventListener('paste', e => e.preventDefault());
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) triggerLockout();
+            });
+            window.addEventListener('blur', () => { triggerLockout(); });
+        }
+
+        function triggerLockout() {
+            violationCount++;
+            document.getElementById('violation-count').innerText = violationCount;
+            document.getElementById('lockout-modal').classList.remove('hidden-view');
+
+            if (roomRef) {
+                const safeName = userName.replace(/[.#$\/\[\]]/g, '_');
+                roomRef.child('students/' + safeName).update({
+                    status: 'LOCKED',
+                    violations: violationCount
+                });
+            }
+        }
+
+        function tryUnlock() {
+            const pass = document.getElementById('unlock-pass-input').value.trim();
+            if (pass === adminPass) {
+                document.getElementById('lockout-modal').classList.add('hidden-view');
+                document.getElementById('unlock-pass-input').value = '';
+
+                if (roomRef) {
+                    const safeName = userName.replace(/[.#$\/\[\]]/g, '_');
+                    roomRef.child('students/' + safeName).update({ status: 'ACTIVE' });
+                }
+            } else {
+                alert('Galat Admin Password!');
+            }
+        }
+
+        function handleAnswerSelection(idx, selectedOpt, correctOpt) {
+            studentAnswers[idx] = selectedOpt;
+
+            const radios = document.querySelectorAll(`input[name="q_${idx}"]`);
+            radios.forEach(r => r.disabled = true);
+
+            radios.forEach(r => {
+                const label = r.parentElement;
+                if (r.value === correctOpt) {
+                    label.classList.add('bg-emerald-900/60', 'border-emerald-500', 'text-emerald-300');
+                } else if (r.checked && r.value !== correctOpt) {
+                    label.classList.add('bg-red-900/60', 'border-red-500', 'text-red-300');
+                }
+            });
+
+            if (Object.keys(studentAnswers).length === globalQuestions.length) {
+                calculateAndSubmitScore();
+            }
+        }
+
+        function calculateAndSubmitScore() {
+            let correctCount = 0;
+            globalQuestions.forEach((q, idx) => {
+                if (studentAnswers[idx] === q.correct) {
+                    correctCount++;
+                }
+         
